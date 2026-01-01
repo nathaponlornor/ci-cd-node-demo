@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('version 2 of Hello from CI/CD Pipeline 🚀');
+  res.send('version 3 webhook  of Hello from CI/CD Pipeline 🚀');
 });
 
 app.listen(3000, () => {
