@@ -8,6 +8,8 @@ pipeline {
   environment {
     AWS_REGION = 'ap-southeast-7'
     EKS_CLUSTER = 'demo-eks'
+    IMAGE_REPO = '176501510816.dkr.ecr.ap-southeast-7.amazonaws.com/demo-app'
+    IMAGE_TAG  = "${BUILD_NUMBER}"
   }
 
   stages {
@@ -22,32 +24,38 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         sh '''
-          docker build -t demo-app:latest .
+          docker build -t demo-app:${IMAGE_TAG} .
+          docker tag demo-app:${IMAGE_TAG} ${IMAGE_REPO}:${IMAGE_TAG}
         '''
       }
     }
 
-    stage('Run Tests') {
+    stage('Push to ECR') {
       steps {
         sh '''
-          echo "No test for now – pass"
+          aws ecr get-login-password --region ${AWS_REGION} \
+          | docker login --username AWS --password-stdin ${IMAGE_REPO}
+          docker push ${IMAGE_REPO}:${IMAGE_TAG}
         '''
       }
     }
 
     stage('Approval to Deploy') {
       steps {
-        input message: 'Approve deployment to EKS?',
-              ok: 'Deploy'
+        input message: "Deploy image ${IMAGE_TAG} to EKS?",
+              ok: "Deploy"
       }
     }
 
     stage('Deploy to EKS') {
       steps {
         sh '''
-          echo "Deploying to EKS..."
+          echo "Deploying image ${IMAGE_REPO}:${IMAGE_TAG} to EKS"
 
-          kubectl apply --validate=false -f deployment.yaml
+          # แทนค่า IMAGE_PLACEHOLDER แล้ว apply (ใส่ --validate=false ตรงนี้!)
+          sed "s|IMAGE_PLACEHOLDER|${IMAGE_REPO}:${IMAGE_TAG}|" deployment.yaml \
+          | kubectl apply --validate=false -f -
+
           kubectl apply --validate=false -f service.yaml
 
           kubectl rollout status deployment/demo-app
